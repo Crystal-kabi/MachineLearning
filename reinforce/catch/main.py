@@ -236,7 +236,7 @@ def train_Q(init_qtable, environment, epsilon, alpha, gamma, episodes):
         progress = int(i / episodes * 100)
         if progress > whole_progress:
             clear_output(wait=True)
-            print(f"\n{progress}% |" + "\x1b[40m \x1b[0m" * progress + "\x1b[39m \x1b[0m" * (100 - progress) + "|\n")
+            print(f"Training progress: {progress}% |" + "\x1b[40m \x1b[0m" * progress + "\x1b[39m \x1b[0m" * (100 - progress) + "|", end="\r")
             whole_progress = progress
 
     end_time = datetime.now()
