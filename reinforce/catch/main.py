@@ -1,5 +1,4 @@
 import numpy as np
-import itertools
 import random
 from IPython.display import clear_output
 from time import sleep
@@ -39,7 +38,7 @@ class Environment:
                     rwd_row.append(10)
                 else:
                     # rwd_row.append(-1)
-                    rwd_row.append(2 * self.size - ((abs(j - target_j) + abs(i - target_i))))
+                    rwd_row.append(2 * self.size - (abs(j - target_j) + abs(i - target_i)))
             board.append(row)
             reward.append(rwd_row)
 
