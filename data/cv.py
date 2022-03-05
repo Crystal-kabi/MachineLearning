@@ -63,6 +63,7 @@ def hyper_gridsearch_cv(model, feature, hyperparameter_grid, cv, target=None, ev
     if not silence:
         print(f"Grid search: 0/{len(all_hyperparameter_product)}", end="\r", flush=True)
 
+    skipped_hyperparameter = []
     for c in all_hyperparameter_product:
 
         score_on_fold = []
@@ -112,15 +113,6 @@ def hyper_gridsearch_cv(model, feature, hyperparameter_grid, cv, target=None, ev
 
             score_on_fold.append(score)
 
-        if error:
-            if not silence:
-                print(f"{hyperparameter_choice} skipped")
-            combo_cnt += 1
-            continue
-
-        all_fold_mean_score = np.mean(score_on_fold)
-        hyperparameter_score.append(all_fold_mean_score)
-
         end_time = datetime.datetime.now()
         total_time = end_time - start_time
         avg_time = total_time/combo_cnt
@@ -133,13 +125,27 @@ def hyper_gridsearch_cv(model, feature, hyperparameter_grid, cv, target=None, ev
 
         combo_cnt += 1
 
+        if error:
+            skipped_hyperparameter.append(hyperparameter_choice)
+            hyperparameter_score.append(np.nan)
+            continue
+
+        all_fold_mean_score = np.mean(score_on_fold)
+        hyperparameter_score.append(all_fold_mean_score)
+
+    skipped_num = len(skipped_hyperparameter)
     if not silence:
         print("")
+        skipped_cnt = 1
+        while skipped_cnt <= skipped_num:
+            s_h = skipped_hyperparameter[skipped_cnt-1]
+            print(f"Skipped {skipped_cnt}/{skipped_num} |  {s_h} is skipped")
+            skipped_cnt += 1
 
     if minimize:
-        best_hyper_index = np.argmin(hyperparameter_score)
+        best_hyper_index = np.nanargmin(hyperparameter_score)
     else:
-        best_hyper_index = np.argmax(hyperparameter_score)
+        best_hyper_index = np.nanargmax(hyperparameter_score)
 
     best_hyper = all_hyperparameter_product[best_hyper_index]
     best_score = hyperparameter_score[best_hyper_index]
@@ -195,6 +201,7 @@ def model_evaluation_cv(model, hyperparameter, target, cv, feature=None, evaluat
             try:
                 clf.fit(train_feature, train_target)
             except:
+                score_on_fold.append(np.nan)
                 continue
 
             # evaluate on validation
@@ -210,6 +217,7 @@ def model_evaluation_cv(model, hyperparameter, target, cv, feature=None, evaluat
             try:
                 train_target = clf.fit_predict(train_feature)
             except:
+                score_on_fold.append(np.nan)
                 continue
 
             # evaluate on validation
@@ -290,6 +298,7 @@ def nested_cv(model, feature, hyperparameter_grid, inner_cv, outer_cv, target=No
             try:
                 clf.fit(outer_train_feature, outer_train_target)
             except:
+                score_on_fold.append(np.nan)
                 continue
 
             # evaluate on validation
@@ -305,6 +314,7 @@ def nested_cv(model, feature, hyperparameter_grid, inner_cv, outer_cv, target=No
             try:
                 outer_train_target = clf.fit_predict(outer_train_feature)
             except:
+                score_on_fold.append(np.nan)
                 continue
 
             # evaluate on validation
