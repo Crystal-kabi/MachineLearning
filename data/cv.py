@@ -26,12 +26,15 @@ def k_fold_split(k, feature, shuffle=False, random_state=0):
         yield train_index, val_index
 
 
-def hyper_gridsearch_cv(model, feature, hyperparameter_grid, cv, target=None, evaluate_func=None, evaluate_on_model=False, minimize=True, silence=False, show_time=True):
+def hyper_gridsearch_cv(model, feature, hyperparameter_grid, cv, target=None, evaluate_func=None, metric_hyper=None, evaluate_on_model=False, minimize=True, silence=False, show_time=True):
 
     if not isinstance(feature, np.ndarray):
         feature = np.array(feature)
     if not isinstance(target, np.ndarray) and target is not None:
         target = np.array(target)
+
+    if metric_hyper is None:
+        metric_hyper = {}
 
     k_fold_index = k_fold_split(k=cv, feature=feature)
 
@@ -69,6 +72,14 @@ def hyper_gridsearch_cv(model, feature, hyperparameter_grid, cv, target=None, ev
         score_on_fold = []
 
         hyperparameter_choice = {hyperparameter_name[n]: c[n] for n in range(hyperparameter_num)}
+
+        additional_arg = {}
+        for metric_key, hyper_key in metric_hyper.items():
+            try:
+                additional_arg[metric_key] = hyperparameter_choice[hyper_key]
+            except (ValueError, KeyError):
+                pass
+
         clf = model(**hyperparameter_choice)
 
         error = False
@@ -89,12 +100,12 @@ def hyper_gridsearch_cv(model, feature, hyperparameter_grid, cv, target=None, ev
 
                 # evaluate on validation
                 if evaluate_func is None:
-                    score = clf.score(validate_feature, validate_target)
+                    score = clf.score(validate_feature, validate_target, **additional_arg)
                 elif not evaluate_on_model:
                     prediction = clf.predict(validate_feature)
-                    score = evaluate_func(prediction, validate_target)
+                    score = evaluate_func(prediction, validate_target, **additional_arg)
                 else:
-                    score = evaluate_func(clf)
+                    score = evaluate_func(clf, **additional_arg)
 
             else:
                 try:
@@ -105,11 +116,11 @@ def hyper_gridsearch_cv(model, feature, hyperparameter_grid, cv, target=None, ev
 
                 # evaluate on validation
                 if evaluate_func is None:
-                    score = clf.score(train_feature, train_target)
+                    score = clf.score(train_feature, train_target, **additional_arg)
                 elif not evaluate_on_model:
-                    score = evaluate_func(train_feature, train_target)
+                    score = evaluate_func(train_feature, train_target, **additional_arg)
                 else:
-                    score = evaluate_func(clf)
+                    score = evaluate_func(clf, **additional_arg)
 
             score_on_fold.append(score)
 
@@ -156,12 +167,22 @@ def hyper_gridsearch_cv(model, feature, hyperparameter_grid, cv, target=None, ev
     return cv_info
 
 
-def model_evaluation_cv(model, hyperparameter, target, cv, feature=None, evaluate_func=None, evaluate_on_model=False, silence=False, show_time=True):
+def model_evaluation_cv(model, hyperparameter, target, cv, feature=None, evaluate_func=None, metric_hyper=None, evaluate_on_model=False, silence=False, show_time=True):
 
     if not isinstance(feature, np.ndarray):
         feature = np.array(feature)
     if not isinstance(target, np.ndarray) and target is not None:
         target = np.array(target)
+
+    if metric_hyper is None:
+        metric_hyper = {}
+
+    additional_arg = {}
+    for metric_key, hyper_key in metric_hyper.items():
+        try:
+            additional_arg[metric_key] = hyperparameter[hyper_key]
+        except (ValueError, KeyError):
+            pass
 
     k_fold_index = k_fold_split(k=cv, feature=feature)
 
@@ -206,12 +227,12 @@ def model_evaluation_cv(model, hyperparameter, target, cv, feature=None, evaluat
 
             # evaluate on validation
             if evaluate_func is None:
-                score = clf.score(validate_feature, validate_target)
+                score = clf.score(validate_feature, validate_target, **additional_arg)
             elif not evaluate_on_model:
                 prediction = clf.predict(validate_feature)
-                score = evaluate_func(prediction, validate_target)
+                score = evaluate_func(prediction, validate_target, **additional_arg)
             else:
-                score = evaluate_func(clf)
+                score = evaluate_func(clf, **additional_arg)
 
         else:
             try:
@@ -222,11 +243,11 @@ def model_evaluation_cv(model, hyperparameter, target, cv, feature=None, evaluat
 
             # evaluate on validation
             if evaluate_func is None:
-                score = clf.score(train_feature, train_target)
+                score = clf.score(train_feature, train_target, **additional_arg)
             elif not evaluate_on_model:
-                score = evaluate_func(train_feature, train_target)
+                score = evaluate_func(train_feature, train_target, **additional_arg)
             else:
-                score = evaluate_func(clf)
+                score = evaluate_func(clf, **additional_arg)
         score_on_fold.append(score)
 
         total_time = datetime.datetime.now() - start_time
@@ -247,7 +268,7 @@ def model_evaluation_cv(model, hyperparameter, target, cv, feature=None, evaluat
     return score_on_fold
 
 
-def nested_cv(model, feature, hyperparameter_grid, inner_cv, outer_cv, target=None, evaluate_func=None, minimize=True, evaluate_on_model=False, silence=False, show_time=True):
+def nested_cv(model, feature, hyperparameter_grid, inner_cv, outer_cv, target=None, evaluate_func=None, metric_hyper=None, minimize=True, evaluate_on_model=False, silence=False, show_time=True):
 
     k_fold_index = k_fold_split(k=outer_cv, feature=feature)
 
@@ -287,9 +308,19 @@ def nested_cv(model, feature, hyperparameter_grid, inner_cv, outer_cv, target=No
             outer_train_target = None
             outer_validate_target = None
 
-        grid_search_result = hyper_gridsearch_cv(model=model, feature=outer_train_feature, target=outer_train_target, hyperparameter_grid=hyperparameter_grid, evaluate_func=evaluate_func, cv=inner_cv, evaluate_on_model=evaluate_on_model, minimize=minimize, silence=silence, show_time=show_time)
+        grid_search_result = hyper_gridsearch_cv(model=model, feature=outer_train_feature, target=outer_train_target, hyperparameter_grid=hyperparameter_grid, evaluate_func=evaluate_func, metric_hyper=metric_hyper, cv=inner_cv, evaluate_on_model=evaluate_on_model, minimize=minimize, silence=silence, show_time=show_time)
         grid_search_result_list.append(grid_search_result)
         hyperparameter = grid_search_result["best_hyper"]
+
+        if metric_hyper is None:
+            metric_hyper = {}
+        additional_arg = {}
+        for metric_key, hyper_key in metric_hyper.items():
+            try:
+                additional_arg[metric_key] = hyperparameter[hyper_key]
+            except (ValueError, KeyError):
+                pass
+
         clf = model(**hyperparameter)
 
         if target is not None:
@@ -303,27 +334,27 @@ def nested_cv(model, feature, hyperparameter_grid, inner_cv, outer_cv, target=No
 
             # evaluate on validation
             if evaluate_func is None:
-                score = clf.score(outer_validate_feature, outer_validate_target)
+                score = clf.score(outer_validate_feature, outer_validate_target, **additional_arg)
             elif not evaluate_on_model:
                 prediction = clf.predict(outer_validate_feature)
-                score = evaluate_func(prediction, outer_validate_target)
+                score = evaluate_func(prediction, outer_validate_target, **additional_arg)
             else:
                 score = evaluate_func(clf)
 
         else:
             try:
-                outer_train_target = clf.fit_predict(outer_train_feature)
+                outer_train_target = clf.fit_predict(outer_train_feature, **additional_arg)
             except:
                 score_on_fold.append(np.nan)
                 continue
 
             # evaluate on validation
             if evaluate_func is None:
-                score = clf.score(outer_train_feature, outer_train_target)
+                score = clf.score(outer_train_feature, outer_train_target, **additional_arg)
             elif not evaluate_on_model:
-                score = evaluate_func(outer_train_feature, outer_train_target)
+                score = evaluate_func(outer_train_feature, outer_train_target, **additional_arg)
             else:
-                score = evaluate_func(clf)
+                score = evaluate_func(clf, **additional_arg)
         score_on_fold.append(score)
 
         total_time = datetime.datetime.now() - start_time
