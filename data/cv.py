@@ -175,12 +175,15 @@ def hyper_gridsearch_cv(model, feature, hyperparameter_grid, cv, target=None, ev
     return cv_info
 
 
-def model_evaluation_cv(model, hyperparameter, target, cv, feature=None, evaluate_func=None, metric_hyper=None, evaluate_on_model=False, silence=False, show_time=True):
+def model_evaluation_cv(model, target, cv, hyperparameter=None, feature=None, evaluate_func=None, metric_hyper=None, evaluate_on_model=False, model_info=None, silence=False, show_time=True):
 
     if not isinstance(feature, np.ndarray):
         feature = np.array(feature)
     if not isinstance(target, np.ndarray) and target is not None:
         target = np.array(target)
+
+    if hyperparameter is None:
+        hyperparameter = {}
 
     if metric_hyper is None:
         metric_hyper = {}
@@ -191,6 +194,9 @@ def model_evaluation_cv(model, hyperparameter, target, cv, feature=None, evaluat
             additional_arg[metric_key] = hyperparameter[hyper_key]
         except (ValueError, KeyError):
             pass
+
+    if model_info is None:
+        model_info = []
 
     k_fold_index = k_fold_split(k=cv, feature=feature)
 
@@ -213,6 +219,7 @@ def model_evaluation_cv(model, hyperparameter, target, cv, feature=None, evaluat
             train_target_list.append(train_target)
             validate_target_list.append(validate_target)
 
+    model_info_on_fold = []
     score_on_fold = []
     fold_counter = 1
     start_time = datetime.datetime.now()
@@ -223,6 +230,8 @@ def model_evaluation_cv(model, hyperparameter, target, cv, feature=None, evaluat
         train_feature = train_feature_list[fold_num]
         validate_feature = validate_feature_list[fold_num]
 
+        attr_list = {}
+
         if target is not None:
             train_target = train_target_list[fold_num]
             validate_target = validate_target_list[fold_num]
@@ -231,6 +240,9 @@ def model_evaluation_cv(model, hyperparameter, target, cv, feature=None, evaluat
                 clf.fit(train_feature, train_target)
             except:
                 score_on_fold.append(np.nan)
+                for attr in model_info:
+                    attr_list[attr] = np.nan
+                model_info_on_fold.append(attr_list)
                 continue
 
             # evaluate on validation
@@ -247,6 +259,9 @@ def model_evaluation_cv(model, hyperparameter, target, cv, feature=None, evaluat
                 train_target = clf.fit_predict(train_feature)
             except:
                 score_on_fold.append(np.nan)
+                for attr in model_info:
+                    attr_list[attr] = np.nan
+                model_info_on_fold.append(attr_list)
                 continue
 
             # evaluate on validation
@@ -256,6 +271,14 @@ def model_evaluation_cv(model, hyperparameter, target, cv, feature=None, evaluat
                 score = evaluate_func(train_feature, train_target, **additional_arg)
             else:
                 score = evaluate_func(clf, **additional_arg)
+
+        for attr in model_info:
+            try:
+                attr_list[attr] = clf.__getattribute__(attr)
+            except AttributeError:
+                attr_list[attr] = np.nan
+
+        model_info_on_fold.append(attr_list)
         score_on_fold.append(score)
 
         total_time = datetime.datetime.now() - start_time
@@ -273,15 +296,26 @@ def model_evaluation_cv(model, hyperparameter, target, cv, feature=None, evaluat
     if not silence:
         print("")
 
-    return score_on_fold
+    if len(model_info) > 0:
+        return score_on_fold, model_info_on_fold
+    else:
+        return score_on_fold
 
 
-def nested_cv(model, feature, hyperparameter_grid, inner_cv, outer_cv, target=None, evaluate_func=None, metric_hyper=None, minimize=True, evaluate_on_model=False, silence=False, show_time=True):
+def nested_cv(model, feature, hyperparameter_grid, inner_cv, outer_cv, target=None, inner_evaluate_func=None, outer_evaluate_func=None, metric_hyper=None, minimize=True, inner_evaluate_on_model=False, outer_evaluate_on_model=False, model_info=None, silence=False, show_time=True):
 
     if not isinstance(feature, np.ndarray):
         feature = np.array(feature)
     if not isinstance(target, np.ndarray) and target is not None:
         target = np.array(target)
+
+    if outer_evaluate_func is None:
+        outer_evaluate_func = inner_evaluate_func
+
+    if model_info is None:
+        model_info = []
+    if isinstance(model_info, str):
+        model_info = [model_info]
 
     k_fold_index = k_fold_split(k=outer_cv, feature=feature)
 
@@ -306,6 +340,7 @@ def nested_cv(model, feature, hyperparameter_grid, inner_cv, outer_cv, target=No
             outer_validate_target_list.append(outer_validate_target)
 
     grid_search_result_list = []
+    model_info_on_fold = []
     score_on_fold = []
     fold_counter = 1
     start_time = datetime.datetime.now()
@@ -314,6 +349,8 @@ def nested_cv(model, feature, hyperparameter_grid, inner_cv, outer_cv, target=No
         outer_train_feature = outer_train_feature_list[fold_num]
         outer_validate_feature = outer_validate_feature_list[fold_num]
 
+        attr_list = {}
+
         if target is not None:
             outer_train_target = outer_train_target_list[fold_num]
             outer_validate_target = outer_validate_target_list[fold_num]
@@ -321,7 +358,7 @@ def nested_cv(model, feature, hyperparameter_grid, inner_cv, outer_cv, target=No
             outer_train_target = None
             outer_validate_target = None
 
-        grid_search_result = hyper_gridsearch_cv(model=model, feature=outer_train_feature, target=outer_train_target, hyperparameter_grid=hyperparameter_grid, evaluate_func=evaluate_func, metric_hyper=metric_hyper, cv=inner_cv, evaluate_on_model=evaluate_on_model, minimize=minimize, silence=silence, show_time=show_time)
+        grid_search_result = hyper_gridsearch_cv(model=model, feature=outer_train_feature, target=outer_train_target, hyperparameter_grid=hyperparameter_grid, evaluate_func=inner_evaluate_func, metric_hyper=metric_hyper, cv=inner_cv, evaluate_on_model=inner_evaluate_on_model, minimize=minimize, silence=silence, show_time=show_time)
         grid_search_result_list.append(grid_search_result)
         hyperparameter = grid_search_result["best_hyper"]
 
@@ -343,31 +380,45 @@ def nested_cv(model, feature, hyperparameter_grid, inner_cv, outer_cv, target=No
                 clf.fit(outer_train_feature, outer_train_target)
             except:
                 score_on_fold.append(np.nan)
+                for attr in model_info:
+                    attr_list[attr] = np.nan
+                model_info_on_fold.append(attr_list)
                 continue
 
             # evaluate on validation
-            if evaluate_func is None:
+            if outer_evaluate_func is None:
                 score = clf.score(outer_validate_feature, outer_validate_target, **additional_arg)
-            elif not evaluate_on_model:
+            elif not outer_evaluate_on_model:
                 prediction = clf.predict(outer_validate_feature)
-                score = evaluate_func(prediction, outer_validate_target, **additional_arg)
+                score = outer_evaluate_func(prediction, outer_validate_target, **additional_arg)
             else:
-                score = evaluate_func(clf)
+                score = outer_evaluate_func(clf)
 
         else:
             try:
                 outer_train_target = clf.fit_predict(outer_train_feature, **additional_arg)
             except:
                 score_on_fold.append(np.nan)
+                for attr in model_info:
+                    attr_list[attr] = np.nan
+                model_info_on_fold.append(attr_list)
                 continue
 
             # evaluate on validation
-            if evaluate_func is None:
+            if outer_evaluate_func is None:
                 score = clf.score(outer_train_feature, outer_train_target, **additional_arg)
-            elif not evaluate_on_model:
-                score = evaluate_func(outer_train_feature, outer_train_target, **additional_arg)
+            elif not outer_evaluate_func:
+                score = outer_evaluate_func(outer_train_feature, outer_train_target, **additional_arg)
             else:
-                score = evaluate_func(clf, **additional_arg)
+                score = outer_evaluate_func(clf, **additional_arg)
+
+        for attr in model_info:
+            try:
+                attr_list[attr] = clf.__getattribute__(attr)
+            except AttributeError:
+                attr_list[attr] = np.nan
+
+        model_info_on_fold.append(attr_list)
         score_on_fold.append(score)
 
         total_time = datetime.datetime.now() - start_time
@@ -385,6 +436,9 @@ def nested_cv(model, feature, hyperparameter_grid, inner_cv, outer_cv, target=No
     if not silence:
         print("")
 
+    if len(model_info) > 0:
+        return grid_search_result_list, score_on_fold, model_info_on_fold
+
     return grid_search_result_list, score_on_fold
 
 
@@ -400,4 +454,4 @@ if __name__ == '__main__':
 
     a = hyper_gridsearch_cv(model=SVC, feature=X_iris, target=y_iris, hyperparameter_grid=hyperparam_grid, cv=10)
     b = model_evaluation_cv(model=SVC, hyperparameter=a["best_hyper"], feature=X_iris, target=y_iris, cv=10)
-    c = nested_cv(model=SVC, feature=X_iris, target=y_iris, hyperparameter_grid=hyperparam_grid, outer_cv=5, inner_cv=5)
+    c = nested_cv(model=SVC, feature=X_iris, target=y_iris, hyperparameter_grid=hyperparam_grid, outer_cv=5, inner_cv=5, model_info=["coef0", "gamma"])
