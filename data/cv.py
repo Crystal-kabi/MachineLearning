@@ -4,6 +4,14 @@ import numpy as np
 
 
 def k_fold_split(k, feature, shuffle=False, random_state=0):
+    """
+    Split a data into folds.
+    :param k: Number of folds
+    :param feature: Data to be split
+    :param shuffle: When True, the data is shuffled before split, resulting in a shuffled split.
+    :param random_state: Seeding for shuffle.
+    :return: Generator of tuples (train index, validation index)
+    """
 
     total_data_num = len(feature)
     train_group_len = int(total_data_num/k)
@@ -27,7 +35,23 @@ def k_fold_split(k, feature, shuffle=False, random_state=0):
 
 
 def hyper_gridsearch_cv(model, feature, hyperparameter_grid, cv, target=None, evaluate_func=None, metric_hyper=None, evaluate_on_model=False, minimize=True, silence=False, show_time=True):
-
+    """
+    Grid search hyperparameters on a model for best performace.
+    :param model: Model class to be fit
+    :param feature: Feature used to fit the model
+    :param hyperparameter_grid: A dictionary with the hyperparameter name as key and corresponding grid as value
+    :param cv: Number of fold for validating the performance on a hyperparameter combination
+    :param target: Target for the model to be fitted to. Default is None for unsupervised models.
+    :param evaluate_func: Function for evaluating the performance of the model.
+    :param metric_hyper: Hyperparameters to be passed into the evaluation function. If the evaluating function does not
+    require arguments from hyperparameters. Must be given in dictionary form with hyperparameter
+    name as key and its name for the argument as value. Default is None.
+    :param evaluate_on_model: When True, evaluate on the model instead of prediction result. Default is True.
+    :param minimize: When True, choose the hyperparameters with the least evaluation.
+    :param silence: When True, do not print any progress. Default False.
+    :param show_time: Only turn on when silence is off. When True, show time taken for progress. Default True.
+    :return: Information from cross validation.
+    """
     if not isinstance(feature, np.ndarray):
         feature = np.array(feature)
     if not isinstance(target, np.ndarray) and target is not None:
@@ -175,7 +199,25 @@ def hyper_gridsearch_cv(model, feature, hyperparameter_grid, cv, target=None, ev
     return cv_info
 
 
-def model_evaluation_cv(model, target, cv, hyperparameter=None, feature=None, evaluate_func=None, metric_hyper=None, evaluate_on_model=False, model_info=None, silence=False, show_time=True):
+def model_evaluation_cv(model, feature, cv, hyperparameter=None, target=None, evaluate_func=None, metric_hyper=None, evaluate_on_model=False, model_info=None, silence=False, show_time=True):
+    """
+    Model evaluation through cross validation
+    :param model: Model class to be evaluated
+    :param feature: Feature used to fit the model
+    :param cv: Number of folds for cross validation
+    :param hyperparameter: Hyperparameters feed into the model
+    :param target: Target for the model to fit to for supervised model. Default is None for unsupervised model.
+    :param evaluate_func: Function used to evaluate the model.
+    :param metric_hyper: Hyperparameters to be passed into the evaluation function. If the evaluating function does not
+    require arguments from hyperparameters. Must be given in dictionary form with hyperparameter
+    name as key and its name for the argument as value. Default is None.
+    :param evaluate_on_model: When True, evaluate on model instead of prediction. Default is False.
+    :param model_info: Model attributes to retrieve during cross validation as a list.
+    :param silence: When True, do not print any progress. Default False.
+    :param show_time: Only turn on when silence is off. When True, show time taken for progress. Default True.
+    :return: When model_info is given, return (list of scores on each fold, list of model attributes on each fold).
+    Otherwise, return list of scores on each fold.
+    """
 
     if not isinstance(feature, np.ndarray):
         feature = np.array(feature)
@@ -303,6 +345,28 @@ def model_evaluation_cv(model, target, cv, hyperparameter=None, feature=None, ev
 
 
 def nested_cv(model, feature, hyperparameter_grid, inner_cv, outer_cv, target=None, inner_evaluate_func=None, outer_evaluate_func=None, metric_hyper=None, minimize=True, inner_evaluate_on_model=False, outer_evaluate_on_model=False, model_info=None, silence=False, show_time=True):
+    """
+    Nested cross validation on models to optmise hyperparameters and evaluate performance.
+    :param model: Model class to be optimised and evaluated
+    :param feature: Feature used to fit the model
+    :param hyperparameter_grid: A dictionary with the hyperparameter name as key and corresponding grid as value
+    :param inner_cv: Hyperparameter optimisation cross validation fold.
+    :param outer_cv: Number of fold for validating the performance on a hyperparameter combination
+    :param target:  Target for the model to be fitted to. Default is None for unsupervised models.
+    :param inner_evaluate_func: Function for evaluating the performance of the model on choosing hyperparameters.
+    :param outer_evaluate_func: Function for evaluating the performance of the model for model comparison.
+    :param metric_hyper: Hyperparameters to be passed into the evaluation function. If the evaluating function does not
+    require arguments from hyperparameters. Must be given in dictionary form with hyperparameter
+    name as key and its name for the argument as value. Default is None.
+    :param minimize: When True, choose the hyperparameters with the least evaluation.
+    :param inner_evaluate_on_model: When True, choose hyperparamters based on the model instead of prediction result. Default is True.
+    :param outer_evaluate_on_model: When True, evaluate on the model instead of prediction result. Default is True.
+    :param model_info: Model attributes to retrieve during cross validation as a list.
+    :param silence: When True, do not print any progress. Default False.
+    :param show_time: Only turn on when silence is off. When True, show time taken for progress. Default True.
+    :return: When model_info is given, return (Grid search result, list of scores on each fold, list of model attributes on each fold).
+    Otherwise, return (Grid search result, list of scores on each fold).
+    """
 
     if not isinstance(feature, np.ndarray):
         feature = np.array(feature)

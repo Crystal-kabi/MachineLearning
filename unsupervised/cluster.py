@@ -3,8 +3,17 @@ from sklearn.metrics import silhouette_score
 
 
 class KernelKMeans:
+    """
+    Kernel K-means Clustering
+    """
 
     def __init__(self, kernel=None, **kwargs):
+
+        """
+        Constructor for kernel kmeans clustering
+        :param kernel: The kernel to use. Default is None, in which case, the ordinary kmeans is constructed.
+        :param kwargs: Optional keyword arguments for kmeans clustering.
+        """
 
         self.kernel = kernel
         self.kmeans_estimator = KMeans(**kwargs)
