@@ -1,8 +1,7 @@
 import numpy as np
 
-from sklearn.metrics import silhouette_score
-
 from measure.distance import Euclidean
+from measure.score import Silhouette
 
 
 class KMeans:
@@ -10,7 +9,7 @@ class KMeans:
     def __init__(self, n_clusters=2, distance=None):
         """
         Constructor of K-means clustering
-        :param n_clusters: Number of clusters
+        :param n_clusters: Number of clusters to group
         :param distance: Distance class to compute the distance
         """
 
@@ -159,7 +158,10 @@ class KMeans:
             else:
                 X, y = self.feature, self.cluster
 
-        return silhouette_score(X=X, labels=y)
+        silhouette_scorer = Silhouette(distance=self.distance)
+        silhouette = silhouette_scorer.silhouette_score(X=X, y=y, sample_weight=sample_weight)
+
+        return silhouette
 
 
 class KernelKMeans:
@@ -167,16 +169,21 @@ class KernelKMeans:
     Kernel K-means Clustering
     """
 
-    def __init__(self, kernel=None, **kwargs):
+    def __init__(self, kernel=None, n_cluster=2, distance=None):
 
         """
         Constructor for kernel kmeans clustering
         :param kernel: The kernel to use. Default is None, in which case, the ordinary kmeans is constructed.
-        :param kwargs: Optional keyword arguments for kmeans clustering.
+        :param n_cluster: Number of clusters to group
+        :param distance: Distance class to compute distance
         """
 
         self.kernel = kernel
-        self.kmeans_estimator = KMeans(**kwargs)
+        self.kmeans_estimator = KMeans(n_clusters=n_cluster, distance=distance)
+
+        if distance is None:
+            distance = Euclidean(degree=2)
+        self.distance = distance
 
         self.feature = None
         self.clusters = None
@@ -230,6 +237,7 @@ class KernelKMeans:
         if self.kernel is not None:
             X = self.kernel.transform(X)
 
-        silhouette = silhouette_score(X=X, labels=y)
+        silhouette_scorer = Silhouette(distance=self.distance)
+        silhouette = silhouette_scorer.silhouette_score(X=X, y=y, sample_weight=sample_weight)
 
         return silhouette
