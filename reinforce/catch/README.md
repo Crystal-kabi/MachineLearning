@@ -1,6 +1,6 @@
 # Catch
 
-Simple AI catch object through reinforcement learning
+Simple AI catching game through Q-Table reinforcement learning
 
 run
 ```shell
