@@ -8,4 +8,4 @@ python3 main.py
 ```
 
 Demo result:
-![Alt text](.\examples\4x6_result_1.png)
+![Alt text](https://github.com/patrick-kabi/MachineLearning/tree/main/reinforce/catch/examples/4x6_result_1.png)
